@@ -24,3 +24,5 @@ Thumbs.db
 
 # Proyecto — datos sensibles
 persistence/datos_sorteos.json
+
+dev/

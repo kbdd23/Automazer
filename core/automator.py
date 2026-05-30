@@ -1,33 +1,9 @@
-import time
 import random
-import threading
-import sys
-import select
-
-
-class KillSwitch:
-    """Hilo daemon que escucha 'q' en stdin para detener el bot."""
-
-    def __init__(self):
-        self.killed = False
-        t = threading.Thread(target=self._escuchar, daemon=True)
-        t.start()
-
-    def _escuchar(self):
-        while not self.killed:
-            try:
-                if select.select([sys.stdin], [], [], 0.3)[0]:
-                    tecla = sys.stdin.read(1)
-                    if tecla.lower() == "q":
-                        self.killed = True
-                        print()
-                        print("[PANIC] Bot detenido por el usuario.")
-            except (ValueError, AttributeError):
-                pass
-
 
 from core.domain import SORTEOS
 from core.vision import vision_robot
+from core.utils import dormir
+from core.killswitch import iniciar, detener, fue_matado
 import pyautogui
 import pyperclip
 
@@ -93,14 +69,16 @@ class Automator:
             return
 
         print("[AUTOMATOR] Iniciando automatizacion...")
-        print("[PANIC] Presiona 'q' + Enter para detener en cualquier momento.")
+        print("[PANIC] Presiona 'q' para detener en cualquier momento.")
         print()
 
-        kill = KillSwitch()
+        iniciar()
 
         for clave, sorteo in SORTEOS.items():
-            if kill.killed:
-                break
+            if fue_matado():
+                print()
+                print("[AUTOMATOR] Automatizacion interrumpida.")
+                return
 
             print()
             print("--- {0} ---".format(sorteo.nombre))
@@ -111,8 +89,10 @@ class Automator:
                 continue
 
             for i, url_doc in enumerate(sorteo.urls, 1):
-                if kill.killed:
-                    break
+                if fue_matado():
+                    print()
+                    print("[AUTOMATOR] Automatizacion interrumpida.")
+                    return
 
                 restantes = url_doc["limite"] - url_doc["realizados"]
                 if restantes <= 0:
@@ -122,15 +102,35 @@ class Automator:
 
                 print()
                 print("[URL {0}] Navegando a {1}".format(i, url_doc["url"]))
-                if not self.navegar_a(url_doc["url"]):
-                    print("[FAIL] No se pudo navegar. Saltando URL.")
+
+                pagina_cargada = False
+                for intento in range(3):
+                    if fue_matado():
+                        print()
+                        print("[AUTOMATOR] Automatizacion interrumpida.")
+                        return
+
+                    if self.navegar_a(url_doc["url"]):
+                        if vision_robot.esperar_elemento("barraComentado", timeout=15):
+                            pagina_cargada = True
+                            break
+
+                    if intento < 2:
+                        print("  [RETRY] La pagina no cargo. Reintento {}/3...".format(intento + 2))
+
+                if fue_matado():
+                    print()
+                    print("[AUTOMATOR] Automatizacion interrumpida.")
+                    return
+                if not pagina_cargada:
+                    print("[FAIL] No se pudo cargar la pagina tras 3 intentos. Saltando URL.")
                     continue
 
-                time.sleep(4)
-
                 for j in range(restantes):
-                    if kill.killed:
-                        break
+                    if fue_matado():
+                        print()
+                        print("[AUTOMATOR] Automatizacion interrumpida.")
+                        return
 
                     comentario = self.construir_comentario(sorteo)
                     if not comentario:
@@ -139,13 +139,19 @@ class Automator:
 
                     print('  Comentario {0}/{1}: "{2}..."'.format(
                         j + 1, restantes, comentario[:50]))
-                    time.sleep(random.uniform(1, 3))
+                    if dormir(random.uniform(1, 3)):
+                        print()
+                        print("[AUTOMATOR] Automatizacion interrumpida.")
+                        return
 
                     if not self.escribir_comentario(comentario):
                         print("  [FAIL] No se encontro el campo de comentario.")
                         break
 
-                    time.sleep(random.uniform(0.5, 1.5))
+                    if dormir(random.uniform(0.5, 1.5)):
+                        print()
+                        print("[AUTOMATOR] Automatizacion interrumpida.")
+                        return
 
                     if not self.enviar_comentario():
                         print("  [FAIL] No se pudo enviar el comentario.")
@@ -159,13 +165,14 @@ class Automator:
                     if j < restantes - 1:
                         espera = random.uniform(3, 7)
                         print("  Esperando {0:.1f}s antes del siguiente comentario...".format(espera))
-                        time.sleep(espera)
+                        if dormir(espera):
+                            print()
+                            print("[AUTOMATOR] Automatizacion interrumpida.")
+                            return
 
-        if kill.killed:
-            print("[AUTOMATOR] Automatizacion interrumpida.")
-        else:
-            print()
-            print("[AUTOMATOR] Automatizacion finalizada.")
+        detener()
+        print()
+        print("[AUTOMATOR] Automatizacion finalizada.")
 
 
 if __name__ == "__main__":

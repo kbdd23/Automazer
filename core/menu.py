@@ -11,7 +11,6 @@ class Menu:
         while True:
             print("1.-Iniciar automatización")
             print("2.-Configurar Sorteos(URLs)")
-            print("3.-Calibrar visión")
             print("0.-Salir")
 
             opcion = input("Ingrese una opción: ")
@@ -22,8 +21,6 @@ class Menu:
                 automator.ejecutar()
             elif opcion == "2":
                 Menu.gestionarURL()
-            elif opcion == "3":
-                Menu.calibrar_vision()
             elif opcion == "0":
                 print("[INFO]: Programa terminado.")
                 exit()
@@ -240,7 +237,3 @@ class Menu:
             else:
                 print("Ingrese una opción válida.")
 
-    @staticmethod
-    def calibrar_vision():
-        """Función para calibrar la visión del robot."""
-        pass

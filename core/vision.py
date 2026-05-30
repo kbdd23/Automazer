@@ -1,12 +1,14 @@
 import pyautogui
 import time
 import os
+from core.utils import dormir
+
 
 class VisionRobot:
     """Implementa la visión por reconocimiento de imágenes y prompts de control."""
-    
+
     def __init__(self, folder_assets="assets"):
-        # Resuelve la carpeta assets respecto a la raíz del proyecto (un nivel arriba de code/)
+        # Resuelve la carpeta assets respecto a la raíz del proyecto (un nivel arriba de core/)
         base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.assets = os.path.join(base, folder_assets)
         if not os.path.exists(self.assets):
@@ -16,7 +18,8 @@ class VisionRobot:
     def confirmar_inicio(self):
         """Muestra una ventana emergente para que el usuario prepare el navegador."""
         respuesta = pyautogui.confirm(
-            text="¿Está todo listo para empezar?\nAsegúrate de tener el navegador visible.",
+            text=("¿Está todo listo para empezar?\n"
+                  "Asegúrate de tener el navegador visible."),
             title="Automaz(h)er - Control de Usuario",
             buttons=['¡Sí, adelante!', 'No, espera']
         )
@@ -60,10 +63,43 @@ class VisionRobot:
                 except Exception as e:
                     print(f"[DEBUG Vision]: '{carpeta}/{nombre_img}' intento {intento+1}: {e}")
 
-            time.sleep(1)
+            if dormir(1.0):
+                print("[INFO Vision]: Killswitch activado durante busqueda.")
+                return False
 
         print(f"[FAIL Vision]: Ninguna imagen en '{carpeta}/' coincidio tras {reintentos} intentos.")
         return False
+
+    def esperar_elemento(self, carpeta, timeout=15, intervalo=1.0):
+        """Espera activa: escanea cada <intervalo> segundos hasta que
+        el elemento aparece o se alcanza el <timeout>.
+
+        Retorna True si encontró el elemento, False si expiró el tiempo.
+        """
+        dir_carpeta = os.path.join(self.assets, carpeta)
+        if not os.path.isdir(dir_carpeta):
+            return False
+
+        imagenes = sorted(f for f in os.listdir(dir_carpeta)
+                          if f.lower().endswith(".png"))
+        if not imagenes:
+            return False
+
+        fin = time.time() + timeout
+        while time.time() < fin:
+            for nombre_img in imagenes:
+                ruta = os.path.join(dir_carpeta, nombre_img)
+                try:
+                    punto = pyautogui.locateCenterOnScreen(ruta, confidence=0.6)
+                    if punto:
+                        return True
+                except Exception:
+                    pass
+            if dormir(intervalo):
+                print("[INFO Vision]: Killswitch activado durante espera.")
+                return False
+        return False
+
 
 # Instancia global
 vision_robot = VisionRobot()
