@@ -22,8 +22,5 @@ env/
 .DS_Store
 Thumbs.db
 
-# Proyecto
-code/persistence/datos_sorteos.json
-code/assets/**/*.png
-code/core/__pycache__/
-code/persistence/__pycache__/
+# Proyecto — datos sensibles
+persistence/datos_sorteos.json
